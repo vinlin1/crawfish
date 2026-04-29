@@ -1,15 +1,25 @@
 怎么使用：
 在项目根目录新增.env文件，格式如下：
+
 DEEPSEEK_API_KEY=sk-xxx
+
 BASE_URL=https://api.deepseek.com/v1
+
 TAVILY_API_KEY=tvly-dev-xxxx
+
 WECOM_CORP_ID=xx
+
 WECOM_TOKEN=xx
+
 WECOM_ENCODING_AES_KEY=xx
+
 FEISHU_APP_ID=cli_xx
+
 FEISHU_APP_SECRET=xx
 
+
 (注意内容需替换）
+
 
 ***手搓一条类龙虾***（完整版请查看pdf）
 
