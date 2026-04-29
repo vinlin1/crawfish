@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent 工作台 - 插件化 Web 界面</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f7fa;
+        }
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .panels {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            flex: 1;
+            min-width: 300px;
+        }
+        .chat-panel {
+            flex: 2;
+        }
+        .tools-panel {
+            flex: 1;
+        }
+        .plugin-panel {
+            flex: 2;
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin: 8px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-family: monospace;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        button.danger:hover {
+            background: #c82333;
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+            background: #fafafa;
+            margin-bottom: 12px;
+        }
+        .message {
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+        .user {
+            background: #e3f2fd;
+            text-align: right;
+        }
+        .assistant {
+            background: #f0f0f0;
+        }
+        .tool-list {
+            list-style: none;
+            padding: 0;
+        }
+        .tool-list li {
+            background: #f8f9fa;
+            margin: 8px 0;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        .tool-name {
+            font-weight: bold;
+        }
+        .tool-desc {
+            font-size: 0.85em;
+            color: #555;
+        }
+        .file-list {
+            margin-bottom: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .file-item button {
+            padding: 2px 8px;
+            font-size: 0.8em;
+        }
+        .status {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #28a745;
+        }
+        hr {
+            margin: 20px 0;
+        }
+        .flex-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🦞 Agent 插件化工作台</h1>
+    <div class="panels">
+        <!-- 左侧：对话区 -->
+        <div class="panel chat-panel">
+            <h2>💬 对话 (带记忆)</h2>
+            <div class="chat-messages" id="chatMessages">
+                <div class="message assistant">你好！我是你的智能助手，可以使用多种工具。试试问我问题吧。</div>
+            </div>
+            <div class="flex-row">
+                <input type="text" id="questionInput" placeholder="输入你的问题..." style="flex:1;">
+                <button id="sendBtn">发送</button>
+                <button id="resetMemoryBtn" class="secondary">重置记忆</button>
+            </div>
+            <div class="status" id="chatStatus"></div>
+        </div>
+
+        <!-- 中间：已加载工具列表 -->
+        <div class="panel tools-panel">
+            <h2>🛠️ 已加载工具</h2>
+            <button id="reloadToolsBtn">🔄 重新加载插件</button>
+            <ul class="tool-list" id="toolList"></ul>
+            <div class="status" id="toolsStatus"></div>
+        </div>
+    </div>
+
+    <div class="panels" style="margin-top: 20px;">
+        <!-- 右下：插件文件管理 -->
+        <div class="panel plugin-panel">
+            <h2>📁 插件文件管理 (tools/)</h2>
+            <div class="file-list" id="fileList"></div>
+            <div>
+                <input type="text" id="newFileName" placeholder="新文件名.py" style="width: 60%;">
+                <button id="newFileBtn">新建</button>
+            </div>
+            <textarea id="editor" rows="12" placeholder="编辑插件代码..."></textarea>
+            <div>
+                <button id="saveFileBtn">保存</button>
+                <button id="deleteFileBtn" class="danger">删除当前文件</button>
+            </div>
+            <div class="status" id="pluginStatus"></div>
+        </div>
+
+        <!-- 右下：工具测试区 -->
+        <div class="panel">
+            <h2>🧪 测试单个工具</h2>
+            <select id="testToolSelect"></select>
+            <textarea id="testArgs" rows="3" placeholder='输入 JSON 参数，例如 {"query": "天气"} 或 {"expression": "2+3"}'></textarea>
+            <button id="testToolBtn">测试工具</button>
+            <pre id="testResult" style="background:#f4f4f4; padding:8px; border-radius:6px; max-height:200px; overflow:auto;"></pre>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 全局状态
+    let currentFile = null;
+
+    // 辅助函数：调用 API
+    async function api(method, url, data=null) {
+        const options = {
+            method: method,
+            headers: {'Content-Type': 'application/json'}
+        };
+        if (data) options.body = JSON.stringify(data);
+        const response = await fetch(url, options);
+        return await response.json();
+    }
+
+    // 加载工具列表并显示
+    async function loadTools() {
+        const res = await api('GET', '/api/tools');
+        const tools = res.tools || [];
+        const container = document.getElementById('toolList');
+        container.innerHTML = '';
+        tools.forEach(tool => {
+            const li = document.createElement('li');
+            li.innerHTML = `<div class="tool-name">${escapeHtml(tool.name)}</div><div class="tool-desc">${escapeHtml(tool.description)}</div>`;
+            container.appendChild(li);
+        });
+        // 更新测试工具下拉框
+        const select = document.getElementById('testToolSelect');
+        select.innerHTML = '<option value="">-- 选择工具 --</option>';
+        tools.forEach(tool => {
+            const option = document.createElement('option');
+            option.value = tool.name;
+            option.textContent = tool.name;
+            select.appendChild(option);
+        });
+        document.getElementById('toolsStatus').innerText = `共 ${tools.length} 个工具`;
+    }
+
+    // 重新加载插件
+    async function reloadTools() {
+        const res = await api('POST', '/api/reload');
+        document.getElementById('toolsStatus').innerHTML = `重载完成: ${res.log.join(', ')}`;
+        loadTools();
+    }
+
+    // 发送对话
+    async function sendMessage() {
+        const input = document.getElementById('questionInput');
+        const question = input.value.trim();
+        if (!question) return;
+        // 显示用户消息
+        addMessage(question, 'user');
+        input.value = '';
+        document.getElementById('chatStatus').innerText = '思考中...';
+        try {
+            const res = await api('POST', '/api/chat', {question});
+            addMessage(res.answer, 'assistant');
+            document.getElementById('chatStatus').innerText = '';
+        } catch (err) {
+            addMessage('错误: ' + err.message, 'assistant');
+            document.getElementById('chatStatus').innerText = '错误';
+        }
+    }
+
+    function addMessage(text, role) {
+        const container = document.getElementById('chatMessages');
+        const div = document.createElement('div');
+        div.className = 'message ' + role;
+        div.innerText = text;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    async function resetMemory() {
+        await api('POST', '/api/reset_memory');
+        addMessage('记忆已重置', 'assistant');
+    }
+
+    // 加载插件文件列表
+    async function loadFileList() {
+        const res = await api('GET', '/api/plugins');
+        const files = res.files || [];
+        const container = document.getElementById('fileList');
+        container.innerHTML = '';
+        files.forEach(file => {
+            const div = document.createElement('div');
+            div.className = 'file-item';
+            div.innerHTML = `
+                <span>📄 ${escapeHtml(file)}</span>
+                <div>
+                    <button onclick="loadFile('${file}')">编辑</button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+        if (files.length === 0) {
+            container.innerHTML = '<div>暂无插件文件，请新建</div>';
+        }
+    }
+
+    async function loadFile(filename) {
+        const res = await api('GET', `/api/plugins/${filename}`);
+        if (res.content !== undefined) {
+            document.getElementById('editor').value = res.content;
+            currentFile = filename;
+            document.getElementById('pluginStatus').innerText = `当前编辑: ${filename}`;
+        } else {
+            alert('加载失败');
+        }
+    }
+
+    async function saveCurrentFile() {
+        if (!currentFile) {
+            alert('请先选择一个文件');
+            return;
+        }
+        const content = document.getElementById('editor').value;
+        const res = await api('POST', `/api/plugins/${currentFile}`, {content});
+        if (res.status === 'saved') {
+            document.getElementById('pluginStatus').innerText = `已保存 ${currentFile}，插件已重载`;
+            loadFileList();
+            loadTools();
+        } else {
+            alert('保存失败');
+        }
+    }
+
+    async function deleteCurrentFile() {
+        if (!currentFile) return;
+        if (!confirm(`确定删除 ${currentFile} 吗？`)) return;
+        const res = await api('DELETE', `/api/plugins/${currentFile}`);
+        if (res.status === 'deleted') {
+            document.getElementById('editor').value = '';
+            currentFile = null;
+            document.getElementById('pluginStatus').innerText = `已删除，插件已重载`;
+            loadFileList();
+            loadTools();
+        } else {
+            alert('删除失败');
+        }
+    }
+
+    async function createNewFile() {
+        const name = document.getElementById('newFileName').value.trim();
+        if (!name) return alert('请输入文件名，以 .py 结尾');
+        if (!name.endsWith('.py')) return alert('文件名必须以 .py 结尾');
+        // 简单模板
+        const template = `def _run() -> str:
+    """你的工具逻辑"""
+    return "Hello from custom tool!"
+
+name = "${name.replace('.py', '')}"
+description = "这是一个自定义工具"
+func = _run
+`;
+        const res = await api('POST', `/api/plugins/${name}`, {content: template});
+        if (res.status === 'saved') {
+            document.getElementById('pluginStatus').innerText = `已创建 ${name}，插件已重载`;
+            loadFileList();
+            loadTools();
+            currentFile = name;
+            document.getElementById('editor').value = template;
+        } else {
+            alert('创建失败');
+        }
+    }
+
+    async function testTool() {
+        const toolName = document.getElementById('testToolSelect').value;
+        if (!toolName) return alert('请选择工具');
+        let args;
+        try {
+            args = JSON.parse(document.getElementById('testArgs').value || '{}');
+        } catch(e) {
+            alert('参数格式错误，需要合法 JSON');
+            return;
+        }
+        const res = await api('POST', '/api/test_tool', {tool_name: toolName, args});
+        const resultDiv = document.getElementById('testResult');
+        if (res.success) {
+            resultDiv.innerText = `✅ 结果:\n${res.result}`;
+        } else {
+            resultDiv.innerText = `❌ 错误:\n${res.error}`;
+        }
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // 绑定事件
+    document.getElementById('sendBtn').onclick = sendMessage;
+    document.getElementById('resetMemoryBtn').onclick = resetMemory;
+    document.getElementById('reloadToolsBtn').onclick = reloadTools;
+    document.getElementById('saveFileBtn').onclick = saveCurrentFile;
+    document.getElementById('deleteFileBtn').onclick = deleteCurrentFile;
+    document.getElementById('newFileBtn').onclick = createNewFile;
+    document.getElementById('testToolBtn').onclick = testTool;
+    document.getElementById('questionInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+
+    // 初始化
+    loadTools();
+    loadFileList();
+</script>
+</body>
+</html>

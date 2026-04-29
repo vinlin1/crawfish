@@ -1,0 +1,35 @@
+# 虚拟环境
+bin/
+lib/
+lib64/
+include/
+pyvenv.cfg
+
+# Python 编译文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 环境变量
+.env
+.env.local
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.swp
+*~
+
+# 编辑器目录
+.vscode/
+.idea/
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# Markdown 输出文件（如果需要提交可以删除此行）
+*.md
